@@ -6,10 +6,12 @@ import com.plcoding.cryptotracker.core.domain.util.onError
 import com.plcoding.cryptotracker.core.domain.util.onSuccess
 import com.plcoding.cryptotracker.crypto.domain.CoinDataSource
 import com.plcoding.cryptotracker.crypto.presentation.models.toCoinUi
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.onStart
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -38,6 +40,15 @@ class CoinListViewModel(
             SharingStarted.WhileSubscribed(5000L), // Keep active while subscribed, with a timeout of 5 seconds.
             CoinListState()
         )
+
+    /**
+     * A channel for emitting `CoinListEvent` instances and exposing them as a Flow.
+     * The `_events` channel is used internally to send events, while `events` provides
+     * a public Flow for consumers to collect these events.
+     */
+    private val _events = Channel<CoinListEvent>()
+    val events = _events.receiveAsFlow()
+
 
     /**
      * Handles UI actions.
@@ -74,6 +85,8 @@ class CoinListViewModel(
                 .onError { error ->
                     // Set loading state to false in case of an error
                     _state.update { it.copy(isLoading = false) }
+                    // Send error event to view
+                    _events.send(CoinListEvent.Error(error))
                 }
         }
     }
