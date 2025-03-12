@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.plcoding.cryptotracker.core.domain.util.onError
 import com.plcoding.cryptotracker.core.domain.util.onSuccess
 import com.plcoding.cryptotracker.crypto.domain.CoinDataSource
+import com.plcoding.cryptotracker.crypto.presentation.models.CoinUi
 import com.plcoding.cryptotracker.crypto.presentation.models.toCoinUi
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -15,6 +16,7 @@ import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import java.time.ZonedDateTime
 
 /**
  * ViewModel responsible for managing the state of the coin list UI.
@@ -58,7 +60,7 @@ class CoinListViewModel(
     fun onAction(action: CoinListAction) {
         when (action) {
             is CoinListAction.OnCoinClick -> {
-                // TODO
+                selectCoin(action.coinUi)
             }
         }
     }
@@ -86,6 +88,38 @@ class CoinListViewModel(
                     // Set loading state to false in case of an error
                     _state.update { it.copy(isLoading = false) }
                     // Send error event to view
+                    _events.send(CoinListEvent.Error(error))
+                }
+        }
+    }
+
+    /**
+     * Selects a coin from the list and fetches its historical data.
+     *
+     * This function updates the selected coin state and fetches the coin's price history
+     * for the last 5 days asynchronously. If the fetch is successful, the history is printed;
+     * otherwise, an error event is sent.
+     *
+     * @param coinUi The selected coin UI model.
+     */
+    private fun selectCoin(coinUi: CoinUi) {
+        // Update the UI state with the selected coin
+        _state.update { it.copy(selectedCoin = coinUi) }
+
+        // Launch a coroutine within the ViewModel's scope
+        viewModelScope.launch {
+            coinDataSource
+                .getCoinHistory(
+                    coinId = coinUi.id, // Fetch historical data for the selected coin
+                    start = ZonedDateTime.now().minusDays(5), // Start date: 5 days ago
+                    end = ZonedDateTime.now() // End date: Current date
+                )
+                .onSuccess { history ->
+                    // Log the fetched history (Replace with actual UI update logic if needed)
+                    println(history)
+                }
+                .onError { error ->
+                    // Send an error event to notify observers
                     _events.send(CoinListEvent.Error(error))
                 }
         }
