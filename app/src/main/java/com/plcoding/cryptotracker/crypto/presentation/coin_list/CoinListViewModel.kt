@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.plcoding.cryptotracker.core.domain.util.onError
 import com.plcoding.cryptotracker.core.domain.util.onSuccess
 import com.plcoding.cryptotracker.crypto.domain.CoinDataSource
+import com.plcoding.cryptotracker.crypto.presentation.coin_detail.chart.DataPoint
 import com.plcoding.cryptotracker.crypto.presentation.models.CoinUi
 import com.plcoding.cryptotracker.crypto.presentation.models.toCoinUi
 import kotlinx.coroutines.channels.Channel
@@ -17,6 +18,7 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.time.ZonedDateTime
+import java.time.format.DateTimeFormatter
 
 /**
  * ViewModel responsible for managing the state of the coin list UI.
@@ -115,8 +117,24 @@ class CoinListViewModel(
                     end = ZonedDateTime.now() // End date: Current date
                 )
                 .onSuccess { history ->
-                    // Log the fetched history (Replace with actual UI update logic if needed)
-                    println(history)
+
+                    // Sort the historical data points by dateTime in ascending order
+                    val dataPoints = history
+                        .sortedBy { it.dateTime }
+                        .map {
+                            DataPoint(
+                                x = it.dateTime.hour.toFloat(), // Extract the hour component as the x-axis value
+                                y = it.priceUsd.toFloat(), // Convert price to float for y-axis value
+                                xLabel = DateTimeFormatter
+                                    .ofPattern("ha\nM/d") // Format dateTime to display hour (AM/PM) and month/day
+                                    .format(it.dateTime)
+                            )
+                        }
+
+                    // Update the state by setting the transformed data points in the selectedCoin
+                    _state.update {
+                        it.copy(selectedCoin = it.selectedCoin?.copy(coinPriceHistory = dataPoints))
+                    }
                 }
                 .onError { error ->
                     // Send an error event to notify observers
